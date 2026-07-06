@@ -70,8 +70,45 @@ function makeEnvMap() {
 }
 scene.environment = makeEnvMap();
 
-/* ------------------------------------------------------------------ stars */
-function makeStars(count, spread, size, color, opacity) {
+/* --------------------------------------------------------------- cosmos
+   Layered starfields (soft sprites), bright flare stars, procedural
+   nebulae and a milky-way band — everything additive, cheap, deep.   */
+const cosmos = new THREE.Group();
+scene.add(cosmos);
+
+function starSprite(flare) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 30);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.25, 'rgba(230,242,255,0.55)');
+  grad.addColorStop(1, 'rgba(200,225,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  if (flare) {
+    g.globalCompositeOperation = 'lighter';
+    const beam = (w, l) => {
+      const b = g.createLinearGradient(32 - l, 32, 32 + l, 32);
+      b.addColorStop(0, 'rgba(255,255,255,0)');
+      b.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+      b.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = b;
+      g.fillRect(32 - l, 32 - w / 2, l * 2, w);
+    };
+    beam(2.5, 30);
+    g.save(); g.translate(32, 32); g.rotate(Math.PI / 2); g.translate(-32, -32);
+    beam(2.5, 30);
+    g.restore();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const softTex = starSprite(false);
+const flareTex = starSprite(true);
+
+function makeStars(count, spread, size, color, opacity, tex) {
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
@@ -84,14 +121,132 @@ function makeStars(count, spread, size, color, opacity) {
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   const mat = new THREE.PointsMaterial({
-    size, color, transparent: true, opacity,
+    size, color, transparent: true, opacity, map: tex,
     depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true,
   });
   return new THREE.Points(geo, mat);
 }
-const starsFar = makeStars(2600, 90, 0.14, 0xcfe4f5, 0.75);
-const starsNear = makeStars(900, 55, 0.22, 0x7fd8e8, 0.55);
-scene.add(starsFar, starsNear);
+const starsFar  = makeStars(3600, 110, 0.34, 0xdfeaf7, 0.85, softTex);
+const starsMid  = makeStars(1400, 75,  0.5,  0x9fc4e8, 0.6,  softTex);
+const starsNear = makeStars(520,  52,  0.75, 0x7fd8e8, 0.45, softTex);
+const starsWarm = makeStars(260,  85,  0.55, 0xffd9a8, 0.5,  softTex);
+const starsBig  = makeStars(70,   65,  2.4,  0xffffff, 0.85, flareTex);
+cosmos.add(starsFar, starsMid, starsNear, starsWarm, starsBig);
+
+/* — nebulae — */
+function nebulaTexture(palette) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const g = c.getContext('2d');
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 38; i++) {
+    const x = Math.random() * 512, y = Math.random() * 512;
+    const r = 40 + Math.random() * 150;
+    const col = palette[Math.floor(Math.random() * palette.length)];
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, col.replace('A', (0.05 + Math.random() * 0.09).toFixed(3)));
+    grad.addColorStop(1, col.replace('A', '0'));
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 512, 512);
+  }
+  // radial fade so the plane dissolves into space instead of ending
+  g.globalCompositeOperation = 'destination-out';
+  const fade = g.createRadialGradient(256, 256, 130, 256, 256, 356);
+  fade.addColorStop(0, 'rgba(0,0,0,0)');
+  fade.addColorStop(1, 'rgba(0,0,0,1)');
+  g.fillStyle = fade;
+  g.fillRect(0, 0, 512, 512);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const nebulaMats = [];
+function addNebula(tex, size, x, y, z, rot, op) {
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex, transparent: true, opacity: op,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  mat.userData.baseOp = op;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
+  m.position.set(x, y, z);
+  m.rotation.z = rot;
+  nebulaMats.push(mat);
+  cosmos.add(m);
+  return m;
+}
+const nebCyan   = nebulaTexture(['rgba(45,110,150,A)', 'rgba(30,150,160,A)', 'rgba(60,130,190,A)']);
+const nebPurple = nebulaTexture(['rgba(90,60,180,A)', 'rgba(60,70,190,A)', 'rgba(130,60,160,A)']);
+const nebDeep   = nebulaTexture(['rgba(35,70,120,A)', 'rgba(50,60,140,A)', 'rgba(25,90,120,A)']);
+addNebula(nebDeep,  420, 0, 0, -95, 0.2, 0.32);   // full-sky base wash — no gaps
+addNebula(nebCyan,   70, -24, 10, -58, 0.5, 0.42);
+addNebula(nebPurple, 85,  26, -8, -66, -0.8, 0.36);
+addNebula(nebCyan,   45,   6, 18, -50, 1.9, 0.26);
+
+/* — milky-way band — */
+function milkyWayTexture() {
+  const c = document.createElement('canvas');
+  c.width = 2048; c.height = 512;
+  const g = c.getContext('2d');
+  g.globalCompositeOperation = 'lighter';
+  const glow = g.createLinearGradient(0, 106, 0, 406);
+  glow.addColorStop(0, 'rgba(120,160,210,0)');
+  glow.addColorStop(0.5, 'rgba(150,185,225,0.16)');
+  glow.addColorStop(1, 'rgba(120,160,210,0)');
+  g.fillStyle = glow;
+  g.fillRect(0, 0, 2048, 512);
+  for (let i = 0; i < 5200; i++) {
+    // gaussian-ish spread around the band's center line
+    const y = 256 + (Math.random() + Math.random() + Math.random() - 1.5) * 130;
+    const x = Math.random() * 2048;
+    const r = Math.random() * 1.15;
+    const a = 0.04 + Math.random() * 0.3;
+    const warm = Math.random() < 0.12;
+    g.fillStyle = warm ? `rgba(255,214,170,${a})` : `rgba(215,232,255,${a})`;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  }
+  // dark dust lanes
+  g.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < 14; i++) {
+    const y = 200 + Math.random() * 120, w = 200 + Math.random() * 600;
+    const x = Math.random() * 2048;
+    const dust = g.createRadialGradient(x, y, 0, x, y, w / 2);
+    dust.addColorStop(0, 'rgba(4,8,14,0.35)');
+    dust.addColorStop(1, 'rgba(4,8,14,0)');
+    g.fillStyle = dust;
+    g.save(); g.translate(x, y); g.scale(1, 0.22); g.translate(-x, -y);
+    g.fillRect(x - w, y - w, w * 2, w * 2);
+    g.restore();
+  }
+  // fade every edge of the band so the plane boundary never shows
+  g.globalCompositeOperation = 'destination-out';
+  let f = g.createLinearGradient(0, 0, 300, 0);
+  f.addColorStop(0, 'rgba(0,0,0,1)'); f.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = f; g.fillRect(0, 0, 300, 512);
+  f = g.createLinearGradient(2048, 0, 1748, 0);
+  f.addColorStop(0, 'rgba(0,0,0,1)'); f.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = f; g.fillRect(1748, 0, 300, 512);
+  f = g.createLinearGradient(0, 0, 0, 90);
+  f.addColorStop(0, 'rgba(0,0,0,1)'); f.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = f; g.fillRect(0, 0, 2048, 90);
+  f = g.createLinearGradient(0, 512, 0, 422);
+  f.addColorStop(0, 'rgba(0,0,0,1)'); f.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = f; g.fillRect(0, 422, 2048, 90);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const milkyWay = new THREE.Mesh(
+  new THREE.PlaneGeometry(240, 60),
+  new THREE.MeshBasicMaterial({
+    map: milkyWayTexture(), transparent: true, opacity: 0.5,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  })
+);
+milkyWay.position.set(0, 14, -80);
+milkyWay.rotation.z = -0.32;
+cosmos.add(milkyWay);
 
 /* ------------------------------------------------------------------ earth */
 const loadManager = new THREE.LoadingManager();
@@ -152,39 +307,154 @@ const atmosphere = new THREE.Mesh(
 );
 earthGroup.add(atmosphere);
 
-/* ------------------------------------------------------------ orbit lines */
+/* ------------------------------------------------- orbits: aurora ribbons
+   Elliptical paths rendered as glowing tubes with energy pulses that
+   travel along the orbit and breathe like an aurora.                    */
 const orbitGroup = new THREE.Group();
 earthGroup.add(orbitGroup);
 
-const orbitMats = [];
-const orbitDots = [];
-function addOrbit(rx, ry, tiltX, tiltZ, color, dotPhase, speed) {
+const orbitShaders = [];
+const AURORA_VERT = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }`;
+const AURORA_FRAG = `
+  uniform float uTime, uOp, uSpeed, uPhase, uMul, uTrail;
+  uniform vec3 uColor, uColor2;
+  varying vec2 vUv;
+  void main() {
+    float u = fract(vUv.x + uPhase);
+    // two energy pulses chasing each other, comet-style exponential trails
+    float d1 = fract(u - uTime * uSpeed);
+    float d2 = fract(u - uTime * uSpeed + 0.47);
+    float pulse = exp(-d1 * uTrail) * 1.7 + exp(-d2 * (uTrail * 1.5)) * 0.7;
+    // aurora shimmer along the path
+    float shimmer = 0.82 + 0.18 * sin(u * 52.0 - uTime * 2.6)
+                         * sin(u * 17.0 + uTime * 1.3);
+    float i = min((0.16 + pulse) * shimmer, 1.3);
+    vec3 col = mix(uColor, uColor2, 0.5 + 0.5 * sin(u * 6.2831 + uTime * 0.55));
+    gl_FragColor = vec4(col * i, i) * uOp * uMul;
+  }`;
+
+function auroraMaterial(c1, c2, speed, phase, mul, trail) {
+  const uniforms = {
+    uTime: { value: 0 }, uOp: { value: 0 },
+    uSpeed: { value: speed }, uPhase: { value: phase },
+    uMul: { value: mul }, uTrail: { value: trail },
+    uColor: { value: new THREE.Color(c1) },
+    uColor2: { value: new THREE.Color(c2) },
+  };
+  orbitShaders.push(uniforms);
+  return new THREE.ShaderMaterial({
+    uniforms, vertexShader: AURORA_VERT, fragmentShader: AURORA_FRAG,
+    transparent: true, blending: THREE.AdditiveBlending,
+    depthWrite: false, side: THREE.DoubleSide,
+  });
+}
+
+function addOrbit(rx, ry, tiltX, tiltZ, c1, c2, speed, phase) {
   const g = new THREE.Group();
   g.rotation.set(tiltX, 0, tiltZ);
-  const pts = new THREE.EllipseCurve(0, 0, rx, ry).getPoints(256);
-  const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  const mat = new THREE.LineBasicMaterial({
-    color, transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false,
-  });
-  const line = new THREE.LineLoop(geo, mat);
-  line.rotation.x = Math.PI / 2;
-  g.add(line);
-
-  const dot = new THREE.Mesh(
-    new THREE.SphereGeometry(0.055, 12, 12),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 })
+  const pts = [];
+  for (let i = 0; i < 220; i++) {
+    const a = (i / 220) * Math.PI * 2;
+    pts.push(new THREE.Vector3(Math.cos(a) * rx, 0, Math.sin(a) * ry));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts, true);
+  const core = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 320, 0.014, 8, true),
+    auroraMaterial(c1, c2, speed, phase, 1.0, 7.0)
   );
-  g.add(dot);
+  const halo = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 320, 0.052, 8, true),
+    auroraMaterial(c1, c2, speed, phase, 0.28, 5.0)
+  );
+  g.add(core, halo);
   orbitGroup.add(g);
-  orbitMats.push(mat, dot.material);
-  orbitDots.push({ dot, rx, ry, phase: dotPhase, speed });
 }
-addOrbit(3.15, 2.55, 1.25, 0.5, 0x8b5cf6, 0.0, 0.12);   // PREVENTION
-addOrbit(3.55, 2.75, 1.05, -0.45, 0xff8a3d, 2.2, 0.09); // REMOVAL
-addOrbit(2.85, 2.85, 1.45, 0.15, 0x35e08a, 4.1, 0.15);  // REUSE
+addOrbit(3.15, 2.55, 1.25, 0.5,  0x8b5cf6, 0x4ea0ff, 0.045, 0.0);  // PREVENTION
+addOrbit(3.55, 2.75, 1.05, -0.45, 0xff8a3d, 0xffc78a, 0.032, 0.35); // REMOVAL
+addOrbit(2.85, 2.85, 1.45, 0.15, 0x35e08a, 0x7fd8e8, 0.055, 0.7);  // REUSE
 
 /* -------------------------------------------------------------- satellite */
+/* crinkled gold multi-layer-insulation foil (map + bump from one canvas) */
+function mliTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const g = c.getContext('2d');
+  const base = g.createLinearGradient(0, 0, 512, 512);
+  base.addColorStop(0, '#c8922b');
+  base.addColorStop(0.5, '#e0ac45');
+  base.addColorStop(1, '#a87820');
+  g.fillStyle = base;
+  g.fillRect(0, 0, 512, 512);
+  // random facets = foil wrinkles
+  for (let i = 0; i < 520; i++) {
+    const x = Math.random() * 512, y = Math.random() * 512;
+    const s = 8 + Math.random() * 46;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (Math.random() - 0.5) * s * 2, y + (Math.random() - 0.5) * s * 2);
+    g.lineTo(x + (Math.random() - 0.5) * s * 2, y + (Math.random() - 0.5) * s * 2);
+    g.closePath();
+    const light = Math.random() > 0.5;
+    g.fillStyle = light
+      ? `rgba(255,236,190,${0.04 + Math.random() * 0.13})`
+      : `rgba(70,45,8,${0.04 + Math.random() * 0.12})`;
+    g.fill();
+  }
+  // kapton tape seams
+  g.strokeStyle = 'rgba(90,60,12,0.35)';
+  g.lineWidth = 2;
+  for (let i = 1; i < 4; i++) {
+    g.beginPath(); g.moveTo(i * 128, 0); g.lineTo(i * 128, 512); g.stroke();
+    g.beginPath(); g.moveTo(0, i * 128); g.lineTo(512, i * 128); g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+/* brushed / machined aluminium with panel seams and rivets */
+function brushedTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const g = c.getContext('2d');
+  g.fillStyle = '#aab6c1';
+  g.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 1600; i++) {
+    const y = Math.random() * 512;
+    const x = Math.random() * 512;
+    const l = 30 + Math.random() * 180;
+    const a = 0.015 + Math.random() * 0.05;
+    g.strokeStyle = Math.random() > 0.5 ? `rgba(255,255,255,${a})` : `rgba(40,55,70,${a})`;
+    g.lineWidth = 0.8;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + l, y); g.stroke();
+  }
+  // panel seams
+  g.strokeStyle = 'rgba(35,48,60,0.5)';
+  g.lineWidth = 1.5;
+  [128, 300, 430].forEach((x) => { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 512); g.stroke(); });
+  [170, 370].forEach((y) => { g.beginPath(); g.moveTo(0, y); g.lineTo(512, y); g.stroke(); });
+  // rivets along seams
+  g.fillStyle = 'rgba(50,62,74,0.8)';
+  for (let i = 0; i < 60; i++) {
+    const onX = Math.random() > 0.5;
+    const seam = onX ? [128, 300, 430][Math.floor(Math.random() * 3)] : [170, 370][Math.floor(Math.random() * 2)];
+    const t = 10 + Math.random() * 492;
+    g.beginPath();
+    g.arc(onX ? seam + (Math.random() > 0.5 ? 6 : -6) : t, onX ? t : seam + (Math.random() > 0.5 ? 6 : -6), 1.6, 0, Math.PI * 2);
+    g.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
 function solarCellTexture() {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 512;
@@ -210,11 +480,19 @@ function solarCellTexture() {
   return tex;
 }
 
+const mliTex = mliTexture();
+const brushTex = brushedTexture();
 const M = {
-  alu:      new THREE.MeshStandardMaterial({ color: 0xa8b4c0, metalness: 0.88, roughness: 0.38, envMapIntensity: 1.15 }),
+  alu: new THREE.MeshStandardMaterial({
+    map: brushTex, bumpMap: brushTex, bumpScale: 0.006,
+    metalness: 0.85, roughness: 0.34, envMapIntensity: 1.2,
+  }),
   aluDark:  new THREE.MeshStandardMaterial({ color: 0x4a5764, metalness: 0.85, roughness: 0.42, envMapIntensity: 1.0 }),
-  gold:     new THREE.MeshStandardMaterial({ color: 0xd9a437, metalness: 1.0,  roughness: 0.28, envMapIntensity: 1.5 }),
-  panel:    new THREE.MeshStandardMaterial({ map: solarCellTexture(), metalness: 0.55, roughness: 0.4, envMapIntensity: 0.9 }),
+  gold: new THREE.MeshStandardMaterial({
+    map: mliTex, bumpMap: mliTex, bumpScale: 0.02,
+    metalness: 0.95, roughness: 0.33, envMapIntensity: 1.45,
+  }),
+  panel:    new THREE.MeshStandardMaterial({ map: solarCellTexture(), metalness: 0.85, roughness: 0.24, envMapIntensity: 1.5 }),
   panelBack:new THREE.MeshStandardMaterial({ color: 0x8f9aa5, metalness: 0.8, roughness: 0.5 }),
   white:    new THREE.MeshStandardMaterial({ color: 0xe8eef2, metalness: 0.15, roughness: 0.55, envMapIntensity: 0.6 }),
   dark:     new THREE.MeshStandardMaterial({ color: 0x1c242e, metalness: 0.6,  roughness: 0.6 }),
@@ -224,18 +502,50 @@ const M = {
 const satGroup = new THREE.Group();
 scene.add(satGroup);
 const satInner = new THREE.Group();          // rotates; parts explode inside it
-satInner.rotation.set(0.18, 0.6, -0.12);
+satInner.rotation.set(0.32, 0.85, -0.22);
 satGroup.add(satInner);
 
-const parts = [];   // { obj, home:Vector3, out:Vector3 }
+const parts = [];   // { obj, home, out, rot, spin }
 function part(obj, home, out, labelId) {
   obj.position.copy(home);
   satInner.add(obj);
-  parts.push({ obj, home: home.clone(), out: out.clone() });
+  const still = out.lengthSq() === 0;
+  parts.push({
+    obj, home: home.clone(), out: out.clone(),
+    rot: obj.rotation.clone(),
+    // gentle tumble as the part drifts free (anchored parts stay true)
+    spin: still ? new THREE.Vector3() : new THREE.Vector3(
+      (Math.random() - 0.5) * 0.5,
+      (Math.random() - 0.5) * 0.5,
+      (Math.random() - 0.5) * 0.5,
+    ),
+  });
   if (labelId) labelAnchors[labelId] = obj;
   return obj;
 }
 const labelAnchors = {};
+
+/* small surface hardware so faces never read as blank slabs */
+function greeble(parent, w, h, n, z) {
+  for (let i = 0; i < n; i++) {
+    const kind = Math.random();
+    let m;
+    if (kind < 0.5) {
+      m = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05 + Math.random() * 0.1, 0.04 + Math.random() * 0.08, 0.03),
+        Math.random() > 0.4 ? M.aluDark : M.dark
+      );
+    } else if (kind < 0.8) {
+      m = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.045, 10), M.alu);
+      m.rotation.x = Math.PI / 2;
+    } else {
+      m = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.015, 12), M.gold);
+      m.rotation.x = Math.PI / 2;
+    }
+    m.position.set((Math.random() - 0.5) * w, (Math.random() - 0.5) * h, z);
+    parent.add(m);
+  }
+}
 
 /* — bus core (stays) — */
 const core = new THREE.Group();
@@ -246,6 +556,22 @@ const coreEdges = new THREE.LineSegments(
   new THREE.LineBasicMaterial({ color: 0x7fd8e8, transparent: true, opacity: 0.35 })
 );
 core.add(coreEdges);
+// longeron rails — the primary frame that remains when the skin flies off
+for (const [lx, lz] of [[0.5, 0.5], [-0.5, 0.5], [0.5, -0.5], [-0.5, -0.5]]) {
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.46, 0.06), M.alu);
+  rail.position.set(lx, 0, lz);
+  core.add(rail);
+}
+// wiring harness across the core
+for (let i = 0; i < 3; i++) {
+  const wire = new THREE.Mesh(
+    new THREE.TorusGeometry(0.34 + i * 0.02, 0.008, 6, 40, Math.PI * 1.2),
+    i === 1 ? M.gold : M.dark
+  );
+  wire.rotation.set(Math.PI / 2, 0, i * 1.9);
+  wire.position.y = -0.2 + i * 0.24;
+  core.add(wire);
+}
 part(core, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
 
 /* — internal electronics (revealed by the explosion) — */
@@ -264,13 +590,51 @@ part(core, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
 /* — six bus face plates (fly outward → "opens up") — */
 const plateGeoXY = new THREE.BoxGeometry(1.06, 1.42, 0.045);
 const plateGeoTB = new THREE.BoxGeometry(1.06, 0.045, 1.06);
-part(new THREE.Mesh(plateGeoXY, M.alu),  new THREE.Vector3(0, 0,  0.53), new THREE.Vector3(0, -0.15, 1.35), 'bus');
+
+const frontPlate = new THREE.Group();
+frontPlate.add(new THREE.Mesh(plateGeoXY, M.alu));
+greeble(frontPlate, 0.8, 1.1, 9, 0.045);
+part(frontPlate, new THREE.Vector3(0, 0,  0.53), new THREE.Vector3(0, -0.15, 1.35), 'bus');
+
 part(new THREE.Mesh(plateGeoXY, M.gold), new THREE.Vector3(0, 0, -0.53), new THREE.Vector3(0, 0.15, -1.35));
 const plateGeoZY = new THREE.BoxGeometry(0.045, 1.42, 1.06);
 part(new THREE.Mesh(plateGeoZY, M.gold), new THREE.Vector3( 0.53, 0, 0), new THREE.Vector3( 1.3, 0.1, -0.35));
-part(new THREE.Mesh(plateGeoZY, M.alu),  new THREE.Vector3(-0.53, 0, 0), new THREE.Vector3(-1.3, -0.1, 0.35));
-part(new THREE.Mesh(plateGeoTB, M.alu),  new THREE.Vector3(0,  0.74, 0), new THREE.Vector3(0,  1.15, 0));
+
+part(new THREE.Mesh(plateGeoZY, M.alu), new THREE.Vector3(-0.53, 0, 0), new THREE.Vector3(-1.3, -0.1, 0.35));
+
+/* top plate carries patch antennas + GPS hardware */
+const topPlate = new THREE.Group();
+topPlate.add(new THREE.Mesh(plateGeoTB, M.alu));
+for (const [px, pz] of [[-0.3, 0.28], [0.05, -0.3], [0.32, 0.12]]) {
+  const patch = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.035, 18), M.white);
+  patch.position.set(px, 0.04, pz);
+  topPlate.add(patch);
+  const patchTop = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.012, 18), M.gold);
+  patchTop.position.set(px, 0.062, pz);
+  topPlate.add(patchTop);
+}
+part(topPlate, new THREE.Vector3(0,  0.74, 0), new THREE.Vector3(0,  1.15, 0));
+
 part(new THREE.Mesh(plateGeoTB, M.aluDark), new THREE.Vector3(0, -0.74, 0), new THREE.Vector3(0, -1.15, 0));
+
+/* — launch adapter ring (bottom interface to the rocket) — */
+const adapter = new THREE.Group();
+const ringGeo = new THREE.CylinderGeometry(0.3, 0.34, 0.14, 36, 1, true);
+const ring = new THREE.Mesh(ringGeo, M.alu.clone());
+ring.material.side = THREE.DoubleSide;
+adapter.add(ring);
+const ringLip = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.018, 10, 40), M.aluDark);
+ringLip.rotation.x = Math.PI / 2;
+ringLip.position.y = -0.07;
+adapter.add(ringLip);
+// separation bolts
+for (let i = 0; i < 8; i++) {
+  const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.05, 8), M.dark);
+  const a = (i / 8) * Math.PI * 2;
+  bolt.position.set(Math.cos(a) * 0.32, -0.07, Math.sin(a) * 0.32);
+  adapter.add(bolt);
+}
+part(adapter, new THREE.Vector3(0, -0.62, 0), new THREE.Vector3(0.35, -1.5, -0.4));
 
 /* — solar wings — */
 function wing(side) {
@@ -279,6 +643,13 @@ function wing(side) {
   yoke.rotation.z = Math.PI / 2;
   yoke.position.x = side * 0.25;
   w.add(yoke);
+  // deployment struts back to the bus
+  for (const dy of [-0.18, 0.18]) {
+    const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.54, 8), M.alu);
+    strut.position.set(side * 0.26, dy / 2, 0.02);
+    strut.rotation.z = Math.PI / 2 + side * (dy > 0 ? 0.32 : -0.32);
+    w.add(strut);
+  }
   for (let i = 0; i < 3; i++) {
     const p = new THREE.Mesh(new THREE.BoxGeometry(0.78, 1.5, 0.028), M.panel);
     p.position.set(side * (0.9 + i * 0.82), 0, 0);
@@ -286,6 +657,20 @@ function wing(side) {
     const back = new THREE.Mesh(new THREE.BoxGeometry(0.78, 1.5, 0.006), M.panelBack);
     back.position.z = -0.018;
     p.add(back);
+    // frame rails around each panel
+    const frameMat = M.aluDark;
+    const railH = new THREE.BoxGeometry(0.82, 0.03, 0.04);
+    const railV = new THREE.BoxGeometry(0.03, 1.54, 0.04);
+    for (const dy of [-0.755, 0.755]) {
+      const r = new THREE.Mesh(railH, frameMat);
+      r.position.set(0, dy, -0.004);
+      p.add(r);
+    }
+    for (const dx of [-0.395, 0.395]) {
+      const r = new THREE.Mesh(railV, frameMat);
+      r.position.set(dx, 0, -0.004);
+      p.add(r);
+    }
     w.add(p);
     const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.24, 8), M.alu);
     hinge.position.set(side * (0.49 + i * 0.82), 0, 0);
@@ -572,12 +957,10 @@ function tick() {
   earth.rotation.y += 0.00045;
   clouds.rotation.y += 0.00058;
 
-  /* orbits */
-  orbitMats.forEach((m) => { m.opacity = P.orbit * (m.isLineBasicMaterial ? 0.9 : 1); });
-  orbitDots.forEach((d) => {
-    const a = t * d.speed + d.phase;
-    d.dot.position.set(Math.cos(a) * d.rx, 0, -Math.sin(a) * d.ry);
-    d.dot.scale.setScalar(1 / Math.max(P.earthS, 0.001) * 0.35 + 0.35);
+  /* orbits — aurora ribbons */
+  orbitShaders.forEach((u) => {
+    u.uTime.value = t;
+    u.uOp.value = P.orbit;
   });
   orbitGroup.rotation.y = t * 0.02;
 
@@ -586,19 +969,28 @@ function tick() {
   satGroup.position.set(P.satX * xf, P.satY + Math.sin(t * 0.7) * 0.035, P.satZ);
   satGroup.scale.setScalar(P.satS * sf);
   satInner.rotation.y += 0.0026 * (1 - P.explode * 0.72);
-  satInner.rotation.x = 0.18 + Math.sin(t * 0.23) * 0.04;
+  satInner.rotation.x = 0.32 + Math.sin(t * 0.23) * 0.05;
 
   const k = easeExpl(P.explode);
-  parts.forEach(({ obj, home, out }) => {
+  parts.forEach(({ obj, home, out, rot, spin }) => {
     obj.position.lerpVectors(home, out, k);
+    obj.rotation.set(rot.x + spin.x * k, rot.y + spin.y * k, rot.z + spin.z * k);
   });
 
-  /* stars parallax */
+  /* cosmos — parallax depth + slow drift + twinkle */
   const sp = window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight);
-  starsFar.rotation.y = t * 0.004;
-  starsFar.position.y = sp * 3;
-  starsNear.rotation.y = -t * 0.006;
-  starsNear.position.y = sp * 6;
+  cosmos.position.y = sp * 3.5;
+  cosmos.rotation.z = sp * 0.05;
+  starsFar.rotation.y = t * 0.0025;
+  starsMid.rotation.y = -t * 0.004;
+  starsNear.rotation.y = t * 0.006;
+  starsNear.position.y = sp * 3;      // extra parallax on the closest layer
+  starsBig.material.opacity = 0.7 + Math.sin(t * 1.7) * 0.15;
+  starsNear.material.opacity = 0.38 + Math.sin(t * 2.3 + 1.2) * 0.1;
+  starsWarm.material.opacity = 0.42 + Math.sin(t * 1.1 + 3) * 0.12;
+  nebulaMats.forEach((m, i) => {
+    m.opacity = m.userData.baseOp * (0.85 + 0.15 * Math.sin(t * 0.22 + i * 2.1));
+  });
 
   /* camera drift */
   mouse.x += (mouse.tx - mouse.x) * 0.04;

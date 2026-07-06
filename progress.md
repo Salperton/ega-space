@@ -7,7 +7,23 @@ individual components as you scroll. Content theme: satellites, space, and
 aluminium in spacecraft. Fully static site — no build step, deploys anywhere
 (Vercel-ready as-is).
 
-## Status: v1 complete and verified (2026-07-06)
+## Status: v2 complete and verified (2026-07-07)
+
+### v2 — realism pass (user feedback: less boxy, celestial depth, aurora orbits)
+- **Satellite**: procedural crinkled gold MLI foil + brushed aluminium canvas
+  textures (map + bump), longeron frame rails, launch adapter ring with
+  separation bolts, wiring harness, patch antennas, solar panel frames and
+  deployment struts, surface greebles; exploded parts now tumble gently.
+- **Sky**: 5 layered soft-sprite starfields (incl. flare stars + twinkle),
+  procedural nebulae with a full-sky base wash (no plane-edge gaps),
+  milky-way band with dust lanes and faded edges, scroll parallax on the
+  whole cosmos.
+- **Orbits**: replaced line circles with aurora ribbon shaders — glowing
+  tube ellipses with two travelling comet-trail energy pulses, shimmer,
+  colour gradients, and a wide halo pass (opacity still scroll-driven).
+- Rebranded to EGA (user edit to index.html — keep).
+
+## Status v1: complete and verified (2026-07-06)
 
 ### Journey (scroll phases)
 1. **Hero** — Earth horizon fills the bottom, slow spin, headline over stars.
