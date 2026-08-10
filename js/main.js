@@ -21,7 +21,7 @@ const sun = new THREE.DirectionalLight(0xfff1dd, 2.6);
 sun.position.set(5, 2.5, 3.5);
 scene.add(sun);
 
-const fill = new THREE.DirectionalLight(0x3d6aa8, 0.5);
+const fill = new THREE.DirectionalLight(0x3d6aa8, 0.85);
 fill.position.set(-5, -1, 2);
 scene.add(fill);
 
@@ -133,28 +133,16 @@ const starsWarm = makeStars(260,  85,  0.55, 0xffd9a8, 0.5,  softTex);
 const starsBig  = makeStars(70,   65,  2.4,  0xffffff, 0.85, flareTex);
 cosmos.add(starsFar, starsMid, starsNear, starsWarm, starsBig);
 
-/* — nebulae — */
-function nebulaTexture(palette) {
+/* — nebulae — single soft washes only (random blobs read as torn landmasses) */
+function softWashTexture(inner, mid, outer) {
   const c = document.createElement('canvas');
   c.width = c.height = 512;
   const g = c.getContext('2d');
-  g.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 38; i++) {
-    const x = Math.random() * 512, y = Math.random() * 512;
-    const r = 40 + Math.random() * 150;
-    const col = palette[Math.floor(Math.random() * palette.length)];
-    const grad = g.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, col.replace('A', (0.05 + Math.random() * 0.09).toFixed(3)));
-    grad.addColorStop(1, col.replace('A', '0'));
-    g.fillStyle = grad;
-    g.fillRect(0, 0, 512, 512);
-  }
-  // radial fade so the plane dissolves into space instead of ending
-  g.globalCompositeOperation = 'destination-out';
-  const fade = g.createRadialGradient(256, 256, 130, 256, 256, 356);
-  fade.addColorStop(0, 'rgba(0,0,0,0)');
-  fade.addColorStop(1, 'rgba(0,0,0,1)');
-  g.fillStyle = fade;
+  const grad = g.createRadialGradient(256, 230, 20, 256, 256, 250);
+  grad.addColorStop(0, inner);
+  grad.addColorStop(0.45, mid);
+  grad.addColorStop(1, outer);
+  g.fillStyle = grad;
   g.fillRect(0, 0, 512, 512);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -164,88 +152,77 @@ const nebulaMats = [];
 function addNebula(tex, size, x, y, z, rot, op) {
   const mat = new THREE.MeshBasicMaterial({
     map: tex, transparent: true, opacity: op,
-    blending: THREE.AdditiveBlending, depthWrite: false,
+    blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false,
   });
   mat.userData.baseOp = op;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
   m.position.set(x, y, z);
   m.rotation.z = rot;
+  m.renderOrder = -2;
   nebulaMats.push(mat);
   cosmos.add(m);
   return m;
 }
-const nebCyan   = nebulaTexture(['rgba(45,110,150,A)', 'rgba(30,150,160,A)', 'rgba(60,130,190,A)']);
-const nebPurple = nebulaTexture(['rgba(90,60,180,A)', 'rgba(60,70,190,A)', 'rgba(130,60,160,A)']);
-const nebDeep   = nebulaTexture(['rgba(35,70,120,A)', 'rgba(50,60,140,A)', 'rgba(25,90,120,A)']);
-addNebula(nebDeep,  420, 0, 0, -95, 0.2, 0.32);   // full-sky base wash — no gaps
-addNebula(nebCyan,   70, -24, 10, -58, 0.5, 0.42);
-addNebula(nebPurple, 85,  26, -8, -66, -0.8, 0.36);
-addNebula(nebCyan,   45,   6, 18, -50, 1.9, 0.26);
+addNebula(
+  softWashTexture('rgba(40,85,130,0.55)', 'rgba(30,70,120,0.22)', 'rgba(20,50,90,0)'),
+  480, 8, 6, -90, 0.08, 0.28
+);
+addNebula(
+  softWashTexture('rgba(70,50,140,0.4)', 'rgba(50,60,130,0.16)', 'rgba(30,40,90,0)'),
+  280, 18, -4, -72, -0.25, 0.16
+);
 
-/* — milky-way band — */
+/* — milky-way band — continuous glow only, no dust cutouts */
 function milkyWayTexture() {
   const c = document.createElement('canvas');
   c.width = 2048; c.height = 512;
   const g = c.getContext('2d');
   g.globalCompositeOperation = 'lighter';
-  const glow = g.createLinearGradient(0, 106, 0, 406);
+  const glow = g.createLinearGradient(0, 120, 0, 392);
   glow.addColorStop(0, 'rgba(120,160,210,0)');
-  glow.addColorStop(0.5, 'rgba(150,185,225,0.16)');
+  glow.addColorStop(0.5, 'rgba(150,185,225,0.1)');
   glow.addColorStop(1, 'rgba(120,160,210,0)');
   g.fillStyle = glow;
   g.fillRect(0, 0, 2048, 512);
-  for (let i = 0; i < 5200; i++) {
-    // gaussian-ish spread around the band's center line
-    const y = 256 + (Math.random() + Math.random() + Math.random() - 1.5) * 130;
+  for (let i = 0; i < 3600; i++) {
+    const y = 256 + (Math.random() + Math.random() + Math.random() - 1.5) * 100;
     const x = Math.random() * 2048;
-    const r = Math.random() * 1.15;
-    const a = 0.04 + Math.random() * 0.3;
-    const warm = Math.random() < 0.12;
+    const r = Math.random() * 0.95;
+    const a = 0.025 + Math.random() * 0.18;
+    const warm = Math.random() < 0.1;
     g.fillStyle = warm ? `rgba(255,214,170,${a})` : `rgba(215,232,255,${a})`;
     g.beginPath();
     g.arc(x, y, r, 0, Math.PI * 2);
     g.fill();
   }
-  // dark dust lanes
-  g.globalCompositeOperation = 'source-over';
-  for (let i = 0; i < 14; i++) {
-    const y = 200 + Math.random() * 120, w = 200 + Math.random() * 600;
-    const x = Math.random() * 2048;
-    const dust = g.createRadialGradient(x, y, 0, x, y, w / 2);
-    dust.addColorStop(0, 'rgba(4,8,14,0.35)');
-    dust.addColorStop(1, 'rgba(4,8,14,0)');
-    g.fillStyle = dust;
-    g.save(); g.translate(x, y); g.scale(1, 0.22); g.translate(-x, -y);
-    g.fillRect(x - w, y - w, w * 2, w * 2);
-    g.restore();
-  }
   // fade every edge of the band so the plane boundary never shows
   g.globalCompositeOperation = 'destination-out';
-  let f = g.createLinearGradient(0, 0, 300, 0);
+  let f = g.createLinearGradient(0, 0, 400, 0);
   f.addColorStop(0, 'rgba(0,0,0,1)'); f.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = f; g.fillRect(0, 0, 300, 512);
-  f = g.createLinearGradient(2048, 0, 1748, 0);
+  g.fillStyle = f; g.fillRect(0, 0, 400, 512);
+  f = g.createLinearGradient(2048, 0, 1648, 0);
   f.addColorStop(0, 'rgba(0,0,0,1)'); f.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = f; g.fillRect(1748, 0, 300, 512);
-  f = g.createLinearGradient(0, 0, 0, 90);
+  g.fillStyle = f; g.fillRect(1648, 0, 400, 512);
+  f = g.createLinearGradient(0, 0, 0, 120);
   f.addColorStop(0, 'rgba(0,0,0,1)'); f.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = f; g.fillRect(0, 0, 2048, 90);
-  f = g.createLinearGradient(0, 512, 0, 422);
+  g.fillStyle = f; g.fillRect(0, 0, 2048, 120);
+  f = g.createLinearGradient(0, 512, 0, 392);
   f.addColorStop(0, 'rgba(0,0,0,1)'); f.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = f; g.fillRect(0, 422, 2048, 90);
+  g.fillStyle = f; g.fillRect(0, 392, 2048, 120);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 const milkyWay = new THREE.Mesh(
-  new THREE.PlaneGeometry(240, 60),
+  new THREE.PlaneGeometry(260, 56),
   new THREE.MeshBasicMaterial({
-    map: milkyWayTexture(), transparent: true, opacity: 0.5,
-    blending: THREE.AdditiveBlending, depthWrite: false,
+    map: milkyWayTexture(), transparent: true, opacity: 0.32,
+    blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false,
   })
 );
-milkyWay.position.set(0, 14, -80);
-milkyWay.rotation.z = -0.32;
+milkyWay.position.set(0, 12, -82);
+milkyWay.rotation.z = -0.28;
+milkyWay.renderOrder = -1;
 cosmos.add(milkyWay);
 
 /* ------------------------------------------------------------------ earth */
@@ -259,15 +236,15 @@ scene.add(earthGroup);
 const earthMat = new THREE.MeshStandardMaterial({
   map: srgb(texLoader.load('assets/textures/earth-blue-marble.jpg')),
   bumpMap: texLoader.load('assets/textures/earth-topology.png'),
-  bumpScale: 0.6,
+  bumpScale: 0.22,
   emissiveMap: srgb(texLoader.load('assets/textures/earth-night.jpg')),
   emissive: new THREE.Color(0xffc98a),
-  emissiveIntensity: 0.65,
-  roughness: 0.9,
+  emissiveIntensity: 0.55,
+  roughness: 0.92,
   metalness: 0,
   envMapIntensity: 0.12,
 });
-const earth = new THREE.Mesh(new THREE.SphereGeometry(2, 96, 96), earthMat);
+const earth = new THREE.Mesh(new THREE.SphereGeometry(2, 128, 128), earthMat);
 earth.rotation.set(-0.55, 2.2, 0);   // tilt pole back so the equator faces the camera
 earthGroup.add(earth);
 
@@ -284,7 +261,7 @@ clouds.rotation.x = -0.55;
 earthGroup.add(clouds);
 
 const atmosphere = new THREE.Mesh(
-  new THREE.SphereGeometry(2.14, 64, 64),
+  new THREE.SphereGeometry(2.16, 96, 96),
   new THREE.ShaderMaterial({
     transparent: true, side: THREE.BackSide,
     depthWrite: false, blending: THREE.AdditiveBlending,
@@ -300,8 +277,9 @@ const atmosphere = new THREE.Mesh(
     fragmentShader: `
       uniform vec3 c; varying vec3 vN; varying vec3 vP;
       void main() {
-        float f = pow(clamp(0.62 - dot(vN, normalize(-vP)), 0.0, 1.0), 4.0);
-        gl_FragColor = vec4(c, 1.0) * f * 0.85;
+        float rim = 1.0 - max(0.0, dot(vN, normalize(-vP)));
+        float f = pow(smoothstep(0.22, 0.96, rim), 3.4);
+        gl_FragColor = vec4(c, 1.0) * f * 0.55;
       }`,
   })
 );
@@ -505,20 +483,13 @@ const satInner = new THREE.Group();          // rotates; parts explode inside it
 satInner.rotation.set(0.32, 0.85, -0.22);
 satGroup.add(satInner);
 
-const parts = [];   // { obj, home, out, rot, spin }
+const parts = [];   // { obj, home, out, rot }
 function part(obj, home, out, labelId) {
   obj.position.copy(home);
   satInner.add(obj);
-  const still = out.lengthSq() === 0;
   parts.push({
     obj, home: home.clone(), out: out.clone(),
     rot: obj.rotation.clone(),
-    // gentle tumble as the part drifts free (anchored parts stay true)
-    spin: still ? new THREE.Vector3() : new THREE.Vector3(
-      (Math.random() - 0.5) * 0.5,
-      (Math.random() - 0.5) * 0.5,
-      (Math.random() - 0.5) * 0.5,
-    ),
   });
   if (labelId) labelAnchors[labelId] = obj;
   return obj;
@@ -572,13 +543,13 @@ for (let i = 0; i < 3; i++) {
   wire.position.y = -0.2 + i * 0.24;
   core.add(wire);
 }
-part(core, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
+part(core, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0), 'bus');
 
 /* — internal electronics (revealed by the explosion) — */
 [
-  [0xbfc9d2, new THREE.Vector3(0.1, 0.3, 0.1),   new THREE.Vector3(0.55, 0.85, 0.75)],
-  [0xd9a437, new THREE.Vector3(-0.1, 0, -0.05),  new THREE.Vector3(-0.7, 0.15, 0.85)],
-  [0x8f9aa5, new THREE.Vector3(0.05, -0.3, -0.1), new THREE.Vector3(0.85, -0.35, -0.7)],
+  [0xbfc9d2, new THREE.Vector3(0.1, 0.3, 0.1),   new THREE.Vector3(0.7, 0.75, 0.85)],
+  [0xd9a437, new THREE.Vector3(-0.1, 0, -0.05),  new THREE.Vector3(-0.8, 0.3, 0.85)],
+  [0x8f9aa5, new THREE.Vector3(0.05, -0.3, -0.1), new THREE.Vector3(0.85, -0.4, -0.8)],
 ].forEach(([col, home, out]) => {
   const b = new THREE.Mesh(
     new THREE.BoxGeometry(0.26, 0.2, 0.26),
@@ -587,20 +558,20 @@ part(core, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
   part(b, home, out);
 });
 
-/* — six bus face plates (fly outward → "opens up") — */
+/* — six bus face plates (fly outward along face normals) — */
 const plateGeoXY = new THREE.BoxGeometry(1.06, 1.42, 0.045);
 const plateGeoTB = new THREE.BoxGeometry(1.06, 0.045, 1.06);
 
 const frontPlate = new THREE.Group();
 frontPlate.add(new THREE.Mesh(plateGeoXY, M.alu));
 greeble(frontPlate, 0.8, 1.1, 9, 0.045);
-part(frontPlate, new THREE.Vector3(0, 0,  0.53), new THREE.Vector3(0, -0.15, 1.35), 'bus');
+part(frontPlate, new THREE.Vector3(0, 0,  0.53), new THREE.Vector3(0, 0, 1.55));
 
-part(new THREE.Mesh(plateGeoXY, M.gold), new THREE.Vector3(0, 0, -0.53), new THREE.Vector3(0, 0.15, -1.35));
+part(new THREE.Mesh(plateGeoXY, M.gold), new THREE.Vector3(0, 0, -0.53), new THREE.Vector3(0, 0, -1.55));
 const plateGeoZY = new THREE.BoxGeometry(0.045, 1.42, 1.06);
-part(new THREE.Mesh(plateGeoZY, M.gold), new THREE.Vector3( 0.53, 0, 0), new THREE.Vector3( 1.3, 0.1, -0.35));
+part(new THREE.Mesh(plateGeoZY, M.gold), new THREE.Vector3( 0.53, 0, 0), new THREE.Vector3( 1.55, 0, 0));
 
-part(new THREE.Mesh(plateGeoZY, M.alu), new THREE.Vector3(-0.53, 0, 0), new THREE.Vector3(-1.3, -0.1, 0.35));
+part(new THREE.Mesh(plateGeoZY, M.alu), new THREE.Vector3(-0.53, 0, 0), new THREE.Vector3(-1.55, 0, 0));
 
 /* top plate carries patch antennas + GPS hardware */
 const topPlate = new THREE.Group();
@@ -613,9 +584,9 @@ for (const [px, pz] of [[-0.3, 0.28], [0.05, -0.3], [0.32, 0.12]]) {
   patchTop.position.set(px, 0.062, pz);
   topPlate.add(patchTop);
 }
-part(topPlate, new THREE.Vector3(0,  0.74, 0), new THREE.Vector3(0,  1.15, 0));
+part(topPlate, new THREE.Vector3(0,  0.74, 0), new THREE.Vector3(0,  1.55, 0));
 
-part(new THREE.Mesh(plateGeoTB, M.aluDark), new THREE.Vector3(0, -0.74, 0), new THREE.Vector3(0, -1.15, 0));
+part(new THREE.Mesh(plateGeoTB, M.aluDark), new THREE.Vector3(0, -0.74, 0), new THREE.Vector3(0, -1.55, 0));
 
 /* — launch adapter ring (bottom interface to the rocket) — */
 const adapter = new THREE.Group();
@@ -634,7 +605,7 @@ for (let i = 0; i < 8; i++) {
   bolt.position.set(Math.cos(a) * 0.32, -0.07, Math.sin(a) * 0.32);
   adapter.add(bolt);
 }
-part(adapter, new THREE.Vector3(0, -0.62, 0), new THREE.Vector3(0.35, -1.5, -0.4));
+part(adapter, new THREE.Vector3(0, -0.62, 0), new THREE.Vector3(0, -1.9, 0));
 
 /* — solar wings — */
 function wing(side) {
@@ -679,8 +650,8 @@ function wing(side) {
   }
   return w;
 }
-part(wing(1),  new THREE.Vector3( 0.53, 0.05, 0), new THREE.Vector3( 1.75, 0.35, 0));
-part(wing(-1), new THREE.Vector3(-0.53, 0.05, 0), new THREE.Vector3(-1.75, -0.35, 0), 'panelL');
+part(wing(1),  new THREE.Vector3( 0.53, 0.05, 0), new THREE.Vector3( 2.2, 0.05, 0));
+part(wing(-1), new THREE.Vector3(-0.53, 0.05, 0), new THREE.Vector3(-2.2, -0.05, 0), 'panelL');
 
 /* — high-gain dish — */
 const dishGroup = new THREE.Group();
@@ -702,10 +673,10 @@ dishGroup.add(feedTip);
 const dishMount = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.22, 12), M.aluDark);
 dishMount.position.y = -0.1;
 dishGroup.add(dishMount);
-part(dishGroup, new THREE.Vector3(0, 0.86, 0), new THREE.Vector3(0.15, 2.0, 0.1), 'dish');
+part(dishGroup, new THREE.Vector3(0, 0.86, 0), new THREE.Vector3(0, 2.15, 0), 'dish');
 
 /* — antennas — */
-function whip(x, z, lean) {
+function whip(lean = 0) {
   const a = new THREE.Group();
   const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.6, 8), M.alu);
   rod.position.y = 0.3;
@@ -716,8 +687,8 @@ function whip(x, z, lean) {
   a.rotation.z = lean;
   return a;
 }
-part(whip(), new THREE.Vector3( 0.42, 0.74,  0.42), new THREE.Vector3( 1.1, 1.7,  1.0));
-part(whip(), new THREE.Vector3(-0.42, 0.74, -0.42), new THREE.Vector3(-1.1, 1.7, -1.0));
+part(whip(0.28), new THREE.Vector3( 0.42, 0.74,  0.42), new THREE.Vector3( 1.15, 1.95,  1.05));
+part(whip(-0.28), new THREE.Vector3(-0.42, 0.74, -0.42), new THREE.Vector3(-1.15, 1.95, -1.05));
 
 /* — propellant tank + plumbing — */
 const tankGroup = new THREE.Group();
@@ -726,7 +697,7 @@ tankGroup.add(tank);
 const strap = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.018, 10, 40), M.aluDark);
 strap.rotation.x = Math.PI / 2;
 tankGroup.add(strap);
-part(tankGroup, new THREE.Vector3(0, -0.18, 0.05), new THREE.Vector3(1.15, -0.75, 1.15), 'tank');
+part(tankGroup, new THREE.Vector3(0, -0.18, 0.05), new THREE.Vector3(1.25, -0.85, 1.2), 'tank');
 
 /* — reaction wheels — */
 const wheels = new THREE.Group();
@@ -739,7 +710,7 @@ for (let i = 0; i < 3; i++) {
   wheel.rotation.set(i * 0.9, 0, i * 0.5);
   wheels.add(wheel);
 }
-part(wheels, new THREE.Vector3(-0.05, 0.3, -0.05), new THREE.Vector3(-1.3, 0.85, -0.9), 'wheels');
+part(wheels, new THREE.Vector3(-0.05, 0.3, -0.05), new THREE.Vector3(-1.2, 0.95, -1.1), 'wheels');
 
 /* — thruster — */
 const thrusterGroup = new THREE.Group();
@@ -757,24 +728,24 @@ const glow = new THREE.Mesh(
 glow.rotation.x = Math.PI / 2;
 glow.position.y = -0.16;
 thrusterGroup.add(glow);
-part(thrusterGroup, new THREE.Vector3(0, -0.92, 0), new THREE.Vector3(0, -1.95, 0.2), 'thruster');
+part(thrusterGroup, new THREE.Vector3(0, -0.92, 0), new THREE.Vector3(0, -2.35, 0), 'thruster');
 
-/* — radiators — */
+/* — radiators — clear of the bus face plates */
 const radGeo = new THREE.BoxGeometry(0.55, 1.05, 0.02);
-part(new THREE.Mesh(radGeo, M.white), new THREE.Vector3(0.2, 0, 0.56), new THREE.Vector3(0.55, 0.5, 1.75), 'radiator');
-part(new THREE.Mesh(radGeo, M.white), new THREE.Vector3(-0.2, 0, -0.56), new THREE.Vector3(-0.55, -0.5, -1.75));
+part(new THREE.Mesh(radGeo, M.white), new THREE.Vector3(0.2, 0, 0.56), new THREE.Vector3(0.7, 0.4, 2.05), 'radiator');
+part(new THREE.Mesh(radGeo, M.white), new THREE.Vector3(-0.2, 0, -0.56), new THREE.Vector3(-0.7, -0.4, -2.05));
 
 /* — star tracker + sensor — */
 const tracker = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.2, 14), M.dark);
 tracker.rotation.x = 0.8;
-part(tracker, new THREE.Vector3(0.3, 0.72, -0.25), new THREE.Vector3(0.9, 1.55, -0.75));
+part(tracker, new THREE.Vector3(0.3, 0.72, -0.25), new THREE.Vector3(0.95, 1.7, -0.9));
 const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.16, 18), M.dark.clone());
 lens.rotation.x = Math.PI / 2;
-part(lens, new THREE.Vector3(-0.25, -0.35, 0.56), new THREE.Vector3(-0.85, -1.05, 1.5));
+part(lens, new THREE.Vector3(-0.25, -0.35, 0.56), new THREE.Vector3(-0.95, -0.9, 1.5));
 
 /* ------------------------------------------------------------ parameters */
 const P = {
-  earthX: 0, earthY: -6.9, earthZ: 0, earthS: 3,
+  earthX: 0, earthY: -7.35, earthZ: 0, earthS: 2.7,
   satX: 2.8, satY: -3.2, satZ: 0, satS: 0.001,
   orbit: 0, explode: 0, labels: 0,
 };
@@ -837,11 +808,11 @@ phase('#spacecraft', (top, h, vh) => [top, top + h - vh], {
 /* spacecraft → anatomy : satellite takes center stage */
 phase('#anatomy', (top, h, vh) => [top - vh, top], {
   earthX: -6.0, earthY: -1.4, earthS: 0.3, orbit: 0,
-  satX: 0, satY: -0.12, satS: 0.92,
+  satX: 0, satY: -0.08, satS: 0.82,
 });
 
-/* inside anatomy : THE EXPLOSION */
-phase('#anatomy', (top, h, vh) => [top, top + h * 0.75 - vh], { explode: 1 });
+/* inside anatomy : THE EXPLOSION — ease scale down slightly as it opens */
+phase('#anatomy', (top, h, vh) => [top, top + h * 0.75 - vh], { explode: 1, satS: 0.68 });
 phase('#anatomy', (top, h, vh) => [top + h * 0.18, top + h * 0.42], { labels: 1 });
 phase('#anatomy', (top, h, vh) => [top + h * 0.82 - vh, top + h - vh], { labels: 0 });
 
@@ -853,7 +824,7 @@ phase('#materials', (top, h, vh) => [top - vh, top - vh * 0.25], {
 /* materials → outro : satellite departs, Earth rises again */
 phase('#outro', (top, h, vh) => [top - vh, top], {
   satY: 3.4, satX: 0.5, satS: 0.05,
-  earthX: 0, earthY: -6.9, earthZ: 0, earthS: 3, orbit: 0,
+  earthX: 0, earthY: -7.35, earthZ: 0, earthS: 2.7, orbit: 0,
 });
 
 measurePhases();
@@ -892,13 +863,13 @@ document.querySelector('.nav').style.transition = 'opacity .5s';
 /* ------------------------------------------------------------ part labels */
 const labelsWrap = document.getElementById('part-labels');
 const CHIP_OFFSET = {   // px nudges so chips never collide
-  dish:     [10, -30],
-  panelL:   [-30, -34],
-  bus:      [40, 30],
-  tank:     [-80, 10],
-  wheels:   [-20, -36],
-  thruster: [90, 30],
-  radiator: [30, -40],
+  dish:     [16, -48],
+  panelL:   [-110, -20],
+  bus:      [70, 18],
+  tank:     [-100, 36],
+  wheels:   [-70, -50],
+  thruster: [80, 42],
+  radiator: [90, -36],
 };
 const chips = [...document.querySelectorAll('.part-chip')].map((el, i) => ({
   el, i, anchor: labelAnchors[el.dataset.part],
@@ -966,15 +937,17 @@ function tick() {
 
   /* satellite */
   const sf = Math.min(1, Math.max(0.5, camera.aspect / 1.35));
-  satGroup.position.set(P.satX * xf, P.satY + Math.sin(t * 0.7) * 0.035, P.satZ);
+  satGroup.position.set(P.satX * xf, P.satY + Math.sin(t * 0.7) * 0.035 * (1 - P.explode), P.satZ);
   satGroup.scale.setScalar(P.satS * sf);
-  satInner.rotation.y += 0.0026 * (1 - P.explode * 0.72);
-  satInner.rotation.x = 0.32 + Math.sin(t * 0.23) * 0.05;
+  /* hold still while open so the exploded layout stays readable */
+  const hold = 1 - P.explode;
+  satInner.rotation.y += 0.0026 * hold;
+  satInner.rotation.x = 0.32 + Math.sin(t * 0.23) * 0.05 * hold;
 
   const k = easeExpl(P.explode);
-  parts.forEach(({ obj, home, out, rot, spin }) => {
+  parts.forEach(({ obj, home, out, rot }) => {
     obj.position.lerpVectors(home, out, k);
-    obj.rotation.set(rot.x + spin.x * k, rot.y + spin.y * k, rot.z + spin.z * k);
+    obj.rotation.copy(rot);   // keep assembly orientation — no tumble
   });
 
   /* cosmos — parallax depth + slow drift + twinkle */
