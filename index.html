@@ -8,9 +8,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=7" />
+  <link rel="stylesheet" href="css/style.css?v=11" />
 </head>
 <body>
+  <a class="skip-link" href="#mission">Skip to the mission</a>
 
   <!-- Loader -->
   <div id="loader">
@@ -21,15 +22,16 @@
   </div>
 
   <!-- Fixed 3D scene -->
-  <canvas id="scene"></canvas>
+  <canvas id="scene" aria-label="Interactive 3D view of Earth and the AL-01 concept satellite" role="img"></canvas>
+  <div class="reading-progress" aria-hidden="true"><span></span></div>
 
   <!-- Film grain + vignette -->
   <div class="grain" aria-hidden="true"></div>
   <div class="vignette" aria-hidden="true"></div>
 
   <!-- Satellite part labels (positioned by JS) -->
-  <div id="part-labels" aria-hidden="true">
-    <div class="part-chip" data-part="dish"><span class="chip-dot"></span>High-gain antenna<em>Aluminium mesh reflector</em></div>
+  <div id="part-labels" role="group" aria-label="Spacecraft components">
+    <div class="part-chip" data-part="dish"><span class="chip-dot"></span>High-gain antenna<em>Aluminium reflector</em></div>
     <div class="part-chip" data-part="panelL"><span class="chip-dot"></span>Solar array<em>Al-honeycomb substrate</em></div>
     <div class="part-chip" data-part="bus"><span class="chip-dot"></span>Bus frame<em>6061-T6 aluminium</em></div>
     <div class="part-chip" data-part="tank"><span class="chip-dot"></span>Propellant tank<em>2219 aluminium alloy</em></div>
@@ -41,13 +43,13 @@
   <!-- Nav -->
   <header class="nav">
     <a class="logo mono" href="#top">E<span>GA</span></a>
-    <nav class="nav-links">
+    <nav class="nav-links" id="primary-navigation" aria-label="Main navigation">
       <a href="#mission">Mission</a>
       <a href="#spacecraft">Spacecraft</a>
       <a href="#anatomy">Anatomy</a>
       <a href="#materials">Materials</a>
     </nav>
-    <a class="nav-cta mono" href="#outro">JOIN THE PROGRAM</a>
+    <div class="nav-actions"><button class="motion-toggle mono" type="button" aria-pressed="false" aria-label="Pause ambient animation">PAUSE MOTION</button><button class="menu-toggle mono" type="button" aria-expanded="false" aria-controls="primary-navigation">MENU</button><a class="nav-cta mono" href="#spacecraft">EXPLORE AL-01 <span aria-hidden="true">↗</span></a></div>
   </header>
 
   <main id="top">
@@ -56,10 +58,13 @@
     <section class="panel hero" id="hero">
       <div class="sticky">
         <div class="hero-copy">
-          <p class="eyebrow mono" data-reveal>// LOW EARTH ORBIT — 550 KM ABOVE YOU</p>
-          <h1 data-reveal>Together, innovating <span class="grad">aluminium</span> to make modern life possible.</h1>
-          <div class="scroll-hint mono" data-reveal><span class="hint-line"></span>SCROLL TO LEAVE THE GROUND</div>
+          <p class="eyebrow mono" data-reveal>A NEW PERSPECTIVE · 550 KM ABOVE EARTH</p>
+          <h1 data-reveal>Aluminium.<br /><span class="grad">Beyond Earth.</span></h1>
+          <p class="lede" data-reveal>Together, innovating aluminium to make modern life possible. On our planet. And far beyond it.</p>
+          <a href="#mission" class="scroll-hint mono" data-reveal><span class="hint-line" aria-hidden="true"></span>BEGIN THE JOURNEY <span aria-hidden="true">↓</span></a>
         </div>
+        <div class="hero-coordinate mono" aria-hidden="true"><span>EARTH / SOL SYSTEM</span><span>OUR ONLY HOME.</span></div>
+        <div class="chapter-note mono">AN EXPLORATION IN ALUMINIUM <span>01 — 05</span></div>
       </div>
     </section>
 
@@ -68,13 +73,12 @@
       <div class="sticky">
         <div class="copy left">
           <p class="eyebrow mono" data-reveal>01 // THE MISSION</p>
-          <h2 data-reveal>Three paths.<br />One planet.</h2>
-          <p class="body" data-reveal>Every object we fly follows one of three doctrines.
-            Together they form a closed loop around the planet — nothing launched, nothing lost.</p>
+          <h2 data-reveal>Three paths.<br /> One planet.</h2>
+          <p class="body" data-reveal>Protect what is up there. Recover what is left behind. Rethink what comes next.</p>
           <ul class="orbit-legend" data-reveal>
-            <li><span class="dot purple"></span><div><strong class="mono">PREVENTION</strong><p>Autonomous collision avoidance across every crossing lane.</p></div></li>
-            <li><span class="dot orange"></span><div><strong class="mono">REMOVAL</strong><p>Capture and deorbit of defunct hardware and debris.</p></div></li>
-            <li><span class="dot green"></span><div><strong class="mono">REUSE</strong><p>In-orbit recovery of aluminium structure for the next build.</p></div></li>
+            <li><button class="orbit-option" data-orbit="0" aria-pressed="false"><span class="dot purple"></span><span><strong class="mono">01 / PREVENTION</strong><span class="orbit-description">Safer paths through an increasingly crowded orbit.</span></span><span class="orbit-arrow" aria-hidden="true">↗</span></button></li>
+            <li><button class="orbit-option" data-orbit="1" aria-pressed="false"><span class="dot orange"></span><span><strong class="mono">02 / REMOVAL</strong><span class="orbit-description">Recovering retired hardware and orbital debris.</span></span><span class="orbit-arrow" aria-hidden="true">↗</span></button></li>
+            <li><button class="orbit-option" data-orbit="2" aria-pressed="false"><span class="dot green"></span><span><strong class="mono">03 / REUSE</strong><span class="orbit-description">Giving valuable aluminium a life beyond its first mission.</span></span><span class="orbit-arrow" aria-hidden="true">↗</span></button></li>
           </ul>
         </div>
       </div>
@@ -86,25 +90,25 @@
         <div class="copy left">
           <p class="eyebrow mono" data-reveal>02 // THE SPACECRAFT</p>
           <h2 data-reveal>Meet <span class="grad">AL-01</span>.</h2>
-          <p class="body" data-reveal>Two hundred and forty kilograms of aluminium, silicon and
-            intent — closing in at eight kilometres every second.</p>
+          <p class="body" data-reveal>An exploration of what aluminium makes possible. A lightweight structure. Precision-engineered systems. One extraordinary point of view.</p>
         </div>
-        <div class="hud">
+        <div class="craft-caption mono"><span class="status-dot"></span> AL-01 / ORBITAL CONCEPT <span>DESIGN STUDY — 001</span></div>
+        <div class="hud" aria-label="Illustrative spacecraft specifications">
           <div class="hud-card" data-reveal>
-            <p class="mono hud-label">CURRENT SPEED</p>
-            <p class="hud-value">27k <small>km/h</small></p>
+            <p class="mono hud-label">ORBITAL SPEED</p>
+            <p class="hud-value">7.6 <small>km/s</small></p>
           </div>
           <div class="hud-card" data-reveal>
             <p class="mono hud-label">ALTITUDE</p>
             <p class="hud-value">550 <small>km</small></p>
           </div>
           <div class="hud-card" data-reveal>
-            <p class="mono hud-label">TARGETS DETECTED</p>
-            <p class="hud-value">2 <small>satellites</small></p>
+            <p class="mono hud-label">DESIGN MASS</p>
+            <p class="hud-value">240 <small>kg</small></p>
           </div>
           <div class="hud-card alert" data-reveal>
-            <p class="mono hud-label"><span class="pulse"></span>NEXT INTERCEPT</p>
-            <p class="hud-value">2h 30m <small>13s</small></p>
+            <p class="mono hud-label">ORBITAL PERIOD</p>
+            <p class="hud-value">95 <small>min</small></p>
           </div>
         </div>
       </div>
@@ -114,10 +118,11 @@
     <section class="panel tall" id="anatomy">
       <div class="sticky">
         <div class="copy center-top">
-          <p class="eyebrow mono" data-reveal>03 // EXPLODED VIEW</p>
-          <h2 data-reveal>Every gram, accounted for.</h2>
-          <p class="body dim" data-reveal>Keep scrolling — AL-01 will open up for you.</p>
+          <p class="eyebrow mono" data-reveal>03 // ENGINEERED FROM WITHIN</p>
+          <h2 data-reveal>Nothing without purpose.</h2>
+          <p class="body dim" data-reveal>Scroll to reveal the systems. Every layer has a role.</p>
         </div>
+        <div class="assembly-control"><label class="mono" for="assembly">ASSEMBLED</label><input id="assembly" type="range" min="0" max="100" value="0" aria-label="Satellite exploded view" /><span class="mono">EXPLODED</span></div>
       </div>
     </section>
 
@@ -131,8 +136,8 @@
 
         <div class="bento">
           <article class="card big" data-reveal>
-            <p class="stat"><span class="count" data-count="80">0</span>%</p>
-            <h3>of a satellite's structure is aluminium alloy</h3>
+            <p class="stat">Al</p>
+            <h3>The element of possibility</h3>
             <p>From the primary bus frame to bracketry and skins, alloys like
               6061-T6 and 7075 carry launch loads at a fraction of the mass penalty.</p>
           </article>
@@ -140,21 +145,20 @@
           <article class="card img-card" data-reveal>
             <img src="assets/img/satellite-hero.jpg?v=2" alt="Satellite in low Earth orbit" loading="lazy"
                  onerror="this.closest('.card').classList.add('img-missing')" />
-            <div class="img-card-caption mono">AL-01 · FLIGHT UNIT 001</div>
+            <div class="img-card-caption mono">ORBITAL ENGINEERING · ARTIST’S IMPRESSION</div>
           </article>
 
           <article class="card" data-reveal>
             <p class="stat"><span class="count" data-count="3">0</span>×</p>
             <h3>lighter than steel</h3>
-            <p>One-third the density — and in orbit, every saved kilogram is
-              roughly $10,000 that never has to leave the launch pad.</p>
+            <p>About one-third the density of steel. Less structural mass leaves more room for the instruments, systems and ideas that matter.</p>
           </article>
 
           <article class="card" data-reveal>
             <p class="stat">∞</p>
             <h3>times recyclable</h3>
             <p>Aluminium melts down and flies again without losing its properties.
-              Our REUSE doctrine turns retired satellites into raw feedstock — in orbit.</p>
+              The ambition: make the materials of one mission the beginning of another.</p>
           </article>
 
           <article class="card img-card" data-reveal>
@@ -183,7 +187,7 @@
         <div class="copy center">
           <p class="eyebrow mono" data-reveal>05 // TRANSMISSION ENDS</p>
           <h2 class="giant" data-reveal>Look up.</h2>
-          <p class="body" data-reveal>AL-01 passes overhead sixteen times a day.<br />The next pass is closer than you think.</p>
+          <p class="body" data-reveal>New possibilities begin with a different perspective.<br />The next chapter is ours to make.</p>
           <a class="cta" href="#top" data-reveal>Return to Earth<span class="cta-arrow">↺</span></a>
         </div>
       </div>
@@ -192,12 +196,10 @@
   </main>
 
   <footer class="footer">
-    <p class="mono">EGA © 2031 — BUILT FROM ALUMINIUM, FOR EARTH</p>
-    <p class="mono dim">EARTH IMAGERY · NASA BLUE MARBLE</p>
+    <p class="mono">EGA · BUILT FROM ALUMINIUM, FOR EARTH</p>
+    <p class="mono dim">CONCEPT EXPERIENCE · EARTH IMAGERY: NASA</p>
   </footer>
 
-  <script src="js/vendor/gsap.min.js"></script>
-  <script src="js/vendor/ScrollTrigger.min.js"></script>
-  <script type="module" src="js/main.js?v=8"></script>
+  <script type="module" src="js/interface.js?v=12"></script>
 </body>
 </html>
